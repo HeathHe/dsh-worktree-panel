@@ -29,7 +29,7 @@ dsh plugin --profile web add dsh-worktree-panel
 安装指定版本：
 
 ```sh
-dsh plugin --profile web add dsh-worktree-panel@0.1.4
+dsh plugin --profile web add dsh-worktree-panel@0.1.5
 ```
 
 ### 升级

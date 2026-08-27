@@ -1,10 +1,10 @@
 {
   "name": "dsh-worktree-panel",
   "description": "Worktree + git branch management panel for the DSH Web GUI: orca-style project -> worktree -> sessions tree in the sidebar, with branch/worktree create, open and cleanup backed by real git worktrees and the DSH workspace registry.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "scripts": {
     "build": "node lib/build.mjs",
-    "test": "node test/client-smoke.mjs && node test/render-test.mjs",
+    "test": "node test/host-session-routing.mjs && node test/client-smoke.mjs && node test/render-test.mjs",
     "prepublishOnly": "npm run build && npm test"
   },
   "type": "module",

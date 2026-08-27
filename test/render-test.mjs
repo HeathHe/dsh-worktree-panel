@@ -113,18 +113,19 @@ const byId = {
   s1: sess("s1", "主树上的会话"),
   s2: sess("s2", "feature-01 里的会话", { running: true }),
   s3: sess("s3", "feature-01 里另一个会话"),
+  s4: sess("s4", "不应显示的子代理会话", { origin: "subagent" }),
 }
 const sessionsState = {
   phase: "ready",
   current: "s1",
-  ids: ["s1", "s2", "s3"],
+  ids: ["s1", "s2", "s3", "s4"],
   byId,
 }
 const workspacesState = {
   phase: "ready",
   items: [
     { workspaceId: "ws-main", title: "myapp", createdAt: now, sessionIds: ["s1"] },
-    { workspaceId: "ws-feature", title: "myapp/feature-01", createdAt: now, sessionIds: ["s2", "s3"] },
+    { workspaceId: "ws-feature", title: "myapp/feature-01", createdAt: now, sessionIds: ["s2", "s3", "s4"] },
     { workspaceId: "ws-plain", title: "notes", cwd: "/Users/you/notes", sessionIds: [] },
   ],
   archivedSessionIds: [],
@@ -159,7 +160,9 @@ const treeFixture = {
           behind: 0,
           upstream: "tracking",
           workspaceId: "ws-feature",
-          sessions: [{ id: "s2" }, { id: "s3" }],
+          // Simulate a stale /tree response: s3 remains authoritative in
+          // the workspace sessionIds and must still render under the worktree.
+          sessions: [{ id: "s2" }],
         },
       ],
       sessions: [],
@@ -257,6 +260,9 @@ const checks = [
   ["main worktree row", html.includes("主工作树") || html.includes("Main worktree")],
   ["main session under main worktree", html.includes("主树上的会话")],
   ["nested session under worktree", html.includes("feature-01 里的会话")],
+  ["stale topology recovered from workspace", html.includes("feature-01 里另一个会话")],
+  ["worktree sessions rendered once", (html.match(/feature-01 里的会话/g) || []).length === 1 && (html.match(/feature-01 里另一个会话/g) || []).length === 1],
+  ["subagent session remains hidden", !html.includes("不应显示的子代理会话")],
   ["worktree row plus button", (html.match(/<button[^>]*class="dsh-wtp-icon-btn"/g) || []).length >= 2],
   ["non-git initialization in more menu", html.includes("初始化 Git 并启用 Worktree")],
   ["no duplicate new-session row", !/>\+ 新会话</.test(html)],

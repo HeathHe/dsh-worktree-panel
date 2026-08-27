@@ -29,7 +29,7 @@ Restart `dsh web` after installation. The worktree hierarchy will then appear in
 Install a specific version:
 
 ```sh
-dsh plugin --profile web add dsh-worktree-panel@0.1.4
+dsh plugin --profile web add dsh-worktree-panel@0.1.5
 ```
 
 ### Upgrade
