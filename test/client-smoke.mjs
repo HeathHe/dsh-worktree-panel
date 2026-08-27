@@ -23,6 +23,9 @@ const fakeWindow = {
 }
 
 const code = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "lib", "client.js"), "utf8")
+if (!code.includes('id: "initialize-git"')) throw new Error("non-git initialize action missing from project menu")
+if (!code.includes("startSession(group.workspaceId);")) throw new Error("non-git plus button does not start a session directly")
+if (code.includes('type: "new"')) throw new Error("legacy non-git choice dialog is still reachable")
 // The bundle touches document only inside __wtpEnsureCss (called from a
 // component hook) and the CSS module injector, which is guarded by
 // `typeof document !== "undefined"`; render paths are not exercised here.
@@ -47,7 +50,10 @@ const mod = factory((name) => {
     return { jsx: React.createElement, jsxs: React.createElement, Fragment: React.Fragment }
   }
   if (name === "@deepseek-ai/dsh-client-runtime/client") {
-    return { defineStore: (spec) => ({ ...spec }) }
+    return {
+      defineStore: (spec) => ({ ...spec }),
+      abbreviateHomePath: (path, home) => home && path.startsWith(home) ? "~" + path.slice(home.length) : path,
+    }
   }
   if (name === "@deepseek-ai/dsh-client-ui-primitives") return primitivesStub
   throw new Error("unexpected require: " + name)
@@ -55,10 +61,19 @@ const mod = factory((name) => {
 
 if (typeof mod.apply !== "function") throw new Error("client bundle exports no apply")
 if (!Array.isArray(mod.inject)) throw new Error("client bundle exports no inject list")
+if (!mod.inject.includes("connection")) throw new Error("client bundle does not inject connection")
 
 const registrations = []
+const hostDescription = {
+  getSnapshot: () => ({ home: "/Users/you" }),
+  subscribe: () => () => {},
+}
 const ctx = {
-  locale: { register: () => {} },
+  get: (name) => name === "connection" ? { hostDescription } : undefined,
+  locale: {
+    register: () => {},
+    bind: (ns) => (key, vars) => key,
+  },
   sessions: {
     search: async () => ({ ok: true, value: { items: [] } }),
     searchResultLimit: 50,
@@ -100,6 +115,7 @@ mod.apply(ctx) // official apply registers effects/slots via ctx; returns undefi
 const slotNames = registrations.map((r) => r.name).join(",")
 if (!slotNames.includes("sidebar.workspaces")) throw new Error("sidebar.workspaces slot not registered")
 if (!slotNames.includes("conversation.hero.workspace")) throw new Error("hero workspace slot not registered")
+if (!slotNames.includes("settings.section")) throw new Error("settings.section slot not registered")
 
 console.log(
   "client smoke test OK: patched official bundle factory ran, apply registered slots [" + slotNames + "]",

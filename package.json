@@ -1,11 +1,11 @@
 {
   "name": "dsh-worktree-panel",
   "description": "Worktree + git branch management panel for the DSH Web GUI: orca-style project -> worktree -> sessions tree in the sidebar, with branch/worktree create, open and cleanup backed by real git worktrees and the DSH workspace registry.",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "scripts": {
     "build": "node lib/build.mjs",
     "test": "node test/client-smoke.mjs && node test/render-test.mjs",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build && npm test"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -24,6 +24,7 @@
     },
     "client": {
       "inject": [
+        "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-conversation",
@@ -37,20 +38,22 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-settings-general": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6"
+    "@deepseek-ai/dsh-client-connection": ">=0.1.1-rc.2 <0.2.0",
+    "@deepseek-ai/dsh-client-locale": ">=0.1.1-rc.2 <0.2.0",
+    "@deepseek-ai/dsh-client-runtime": ">=0.1.1-rc.2 <0.2.0",
+    "@deepseek-ai/dsh-client-ui-conversation": ">=0.1.1-rc.2 <0.2.0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.1.1-rc.2 <0.2.0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.1.1-rc.2 <0.2.0",
+    "@deepseek-ai/dsh-client-ui-settings-general": ">=0.1.1-rc.2 <0.2.0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.1-rc.2 <0.2.0",
+    "@deepseek-ai/dsh-invariants": ">=0.1.1-rc.2 <0.2.0"
   },
   "files": [
     "lib",
     "cordis.patch.yml",
     "NOTICE",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

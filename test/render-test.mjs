@@ -28,6 +28,14 @@ const primitives = new Proxy(
   {
     get: (target, prop) => {
       if (prop === Symbol.toStringTag) return "Module"
+      if (prop === "HoverCard") return ({ anchor }) => anchor
+      if (prop === "Menu") {
+        return ({ items = [] }) => React.createElement(
+          "div",
+          { "data-test-menu": "workspace-actions" },
+          items.map((item) => React.createElement("span", { key: item.id }, item.label)),
+        )
+      }
       return "dsh-stub"
     },
   },
@@ -69,6 +77,7 @@ const mod = factoryRef((name) => {
     return {
       defineStore: (s) => ({ ...s }),
       indexSubagentDescendants: () => new Map(),
+      abbreviateHomePath: (path, home) => home && path.startsWith(home) ? "~" + path.slice(home.length) : path,
     }
   }
   if (name === "@deepseek-ai/dsh-client-ui-primitives") return primitives
@@ -77,8 +86,13 @@ const mod = factoryRef((name) => {
 
 // capture the registered components
 const registered = {}
+const hostDescription = {
+  getSnapshot: () => ({ home: "/Users/you" }),
+  subscribe: () => () => {},
+}
 const ctx = {
-  locale: { register: () => {} },
+  get: (name) => name === "connection" ? { hostDescription } : undefined,
+  locale: { register: () => {}, bind: (ns) => (key, vars) => key },
   sessions: { search: async () => ({ ok: true, value: { items: [] } }), searchResultLimit: 50, binding: () => undefined },
   workspaces: {},
   slots: {
@@ -111,13 +125,14 @@ const workspacesState = {
   items: [
     { workspaceId: "ws-main", title: "myapp", createdAt: now, sessionIds: ["s1"] },
     { workspaceId: "ws-feature", title: "myapp/feature-01", createdAt: now, sessionIds: ["s2", "s3"] },
+    { workspaceId: "ws-plain", title: "notes", cwd: "/Users/you/notes", sessionIds: [] },
   ],
   archivedSessionIds: [],
 }
 const viewState = {
   groupBy: "workspace",
   orderBy: "updated",
-  groupExpansion: { "ws-main": true, "ws-feature": true },
+  groupExpansion: { "ws-main": true, "ws-feature": true, "ws-plain": true },
   sessionOrderByAccount: {},
   sessionUpdatedAtByAccount: {},
 }
@@ -162,6 +177,7 @@ const useStore = selectorHook(viewState)
 const useWorkspaces = (selector) => selector(workspacesState)
 const useSessions = (selector) => selector(sessionsState)
 const useDirectoryFlow = (selector) => selector(false)
+const useHostDescription = (selector) => selector({ home: "/Users/you" })
 
 const actions = {
   retainAccountKeys: () => {},
@@ -179,6 +195,7 @@ const t = (key, params) => {
     "wtp.open": "打开",
     "wtp.collapse": "收起",
     "wtp.newSession": "+ 新会话",
+    "wtp.initGitMenu": "初始化 Git 并启用 Worktree",
     "wtp.noPendingBranches": "所有分支都已有 worktree",
     "wtp.newBranchPlaceholder": "新分支名（创建分支并开 worktree）",
     "wtp.createWorktree": "为此分支创建 worktree",
@@ -217,6 +234,7 @@ const props = {
   searchSessions: async () => ({ items: [] }),
   searchResultLimit: 50,
   useDirectoryFlow,
+  useHostDescription,
   renderSlot: () => null,
   t,
 }
@@ -240,6 +258,7 @@ const checks = [
   ["main session under main worktree", html.includes("主树上的会话")],
   ["nested session under worktree", html.includes("feature-01 里的会话")],
   ["worktree row plus button", (html.match(/<button[^>]*class="dsh-wtp-icon-btn"/g) || []).length >= 2],
+  ["non-git initialization in more menu", html.includes("初始化 Git 并启用 Worktree")],
   ["no duplicate new-session row", !/>\+ 新会话</.test(html)],
   ["dialog closed by default", !html.includes("创建分支") && !html.includes("Create branch")],
 ]

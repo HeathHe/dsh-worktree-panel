@@ -2,65 +2,82 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/dsh-worktree-panel"><img alt="npm version" src="https://img.shields.io/npm/v/dsh-worktree-panel?label=npm&color=blue"></a>
-  <a href="https://www.npmjs.com/package/dsh-worktree-panel"><img alt="monthly downloads" src="https://img.shields.io/npm/dm/dsh-worktree-panel?label=%E6%9C%88%E4%B8%8B%E8%BD%BD&color=brightgreen"></a>
+  <a href="https://www.npmjs.com/package/dsh-worktree-panel"><img alt="monthly downloads" src="https://img.shields.io/npm/dm/dsh-worktree-panel?label=downloads&color=brightgreen"></a>
   <a href="https://github.com/HeathHe/dsh-worktree-panel"><img alt="stars" src="https://img.shields.io/github/stars/HeathHe/dsh-worktree-panel?style=social"></a>
   <a href="https://github.com/HeathHe/dsh-worktree-panel/blob/main/LICENSE"><img alt="license" src="https://img.shields.io/github/license/HeathHe/dsh-worktree-panel?color=orange"></a>
   <img alt="platform" src="https://img.shields.io/badge/platform-DeepSeek%20Harness%20Web-8A2BE2">
 </p>
 
-为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web 界面增加 git worktree 维度的分支管理面板：在官方工作区/会话侧边栏之上，展示 **项目 → 主工作树 / 分支 worktree → 会话**，并保留官方列表的全部原有交互。
+<p align="center">
+  <strong>English</strong> | <a href="./README.zh-CN.md">简体中文</a>
+</p>
 
-A git worktree / branch panel for the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web GUI: on top of the official workspace/session sidebar it adds a **project → main working tree / branch worktree → session** dimension while preserving every interaction of the official list.
+A Git worktree and branch-management panel for the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web GUI. It extends the official workspace/session sidebar with a **project → main working tree / branch worktree → session** hierarchy while preserving the original workspace interactions.
 
 ---
 
-## 使用 / Usage
+## Usage
 
-### 安装 / Install
+### Install
 
 ```sh
 dsh plugin --profile web add dsh-worktree-panel
 ```
 
-装完重启 `dsh web`，工作区侧边栏即出现 worktree 维度。/ Restart `dsh web` afterwards; the worktree dimension appears in the sidebar.
+Restart `dsh web` after installation. The worktree hierarchy will then appear in the workspace sidebar.
 
-安装指定版本 / Install a specific version:
+Install a specific version:
 
 ```sh
-dsh plugin --profile web add dsh-worktree-panel@0.1.1
+dsh plugin --profile web add dsh-worktree-panel@0.1.4
 ```
 
-### 升级 / Upgrade
+### Upgrade
 
 ```sh
-dsh plugin --profile web add dsh-worktree-panel@<新版本 / new version>
-# 然后重启 dsh web / then restart dsh web
+dsh plugin --profile web add dsh-worktree-panel@<version>
+# Restart dsh web afterwards.
 ```
 
-### 源码开发 / Development
+### Local development
 
 ```sh
-dsh plugin --profile web add link:/绝对路径/到/dsh-worktree-panel
+dsh plugin --profile web add link:/absolute/path/to/dsh-worktree-panel
 ```
 
 ---
 
-## 功能 / Features
+## Features
 
-- **主工作树 + 分支 worktree** — 项目组内展示主工作树（当前分支 + 干净/有改动状态）与各分支 worktree
-- **会话管理** — 在 worktree 内开新会话、删除 worktree、切换主工作树分支
-- **一键创建** — 底部「＋ 分支 → 创建 worktree」为未建 worktree 的分支一键创建（可选新建分支）
-- **落盘位置可配置** — 默认项目内 `.dsh/workspaces/`，或改为全局目录；更改时自动检测并批量迁移已有 worktree（跳过有未提交改动 / 活跃会话的）
-- **零侵入** — 非 git 工作区保持官方原样，不显示任何 worktree UI
-
-- **Main working tree + branch worktrees** — shows the main working tree (current branch + clean/dirty status) and each branch worktree within a project group
-- **Session management** — open a new session inside a worktree, delete a worktree, switch the main working tree's branch
-- **One-click create** — the bottom "＋ branch → create worktree" button creates a worktree for any branch without one (optionally a new branch)
-- **Configurable location** — default `.dsh/workspaces/` inside the project or a global directory; changing it auto-detects and bulk-migrates existing worktrees (skipping those with uncommitted changes / active sessions)
-- **Zero intrusion** — non-git workspaces stay exactly as the official UI, no worktree UI is shown
+- **Main working tree + branch worktrees** — displays the main working tree, current branch, clean/modified state, and linked branch worktrees inside each project group.
+- **Session management** — starts sessions inside a worktree, removes worktrees, and switches the main working tree branch.
+- **One-click creation** — creates a worktree for an existing branch or creates a new branch and its worktree.
+- **Session-first non-Git folders** — the project-row plus button starts a conversation directly. “Initialize Git and enable worktrees” is available from the project actions menu.
+- **Configurable storage** — stores worktrees in `<project>/.dsh/workspaces/` by default or in a custom global directory.
+- **Safe migration** — detects and migrates existing worktrees when the storage location changes, while skipping worktrees with uncommitted changes or active sessions.
+- **Progressive enhancement** — non-Git workspaces retain the default session workflow and only gain an optional Git/worktree initializer.
 
 ---
 
-## 许可 / License
+## Compatibility
 
-MIT · `lib/client.js` 衍生自 `@deepseek-ai/dsh-client-ui-workspace`，详见 `NOTICE` / `LICENSE`。/ MIT · `lib/client.js` is derived from `@deepseek-ai/dsh-client-ui-workspace`; see `NOTICE` / `LICENSE`.
+- Tested with **DSH Desktop 2.0.3 / DeepSeek Harness 0.1.1-rc.2**.
+- DSH peer dependency range: `>=0.1.1-rc.2 <0.2.0`.
+- Uses a dedicated Worktree settings page through `settings.section`.
+- Supports the current Host description store and home-directory path abbreviation.
+
+### Generated client bundle
+
+`lib/client.js` is generated by `lib/build.mjs` from the official `@deepseek-ai/dsh-client-ui-workspace` browser bundle. The build validates the upstream package version and records it in the generated file header.
+
+Use an explicit upstream bundle when needed:
+
+```sh
+DSH_WORKSPACE_BUNDLE=/absolute/path/to/client.js npm run build
+```
+
+---
+
+## License
+
+MIT. `lib/client.js` is derived from `@deepseek-ai/dsh-client-ui-workspace`; see `NOTICE` and `LICENSE`.
