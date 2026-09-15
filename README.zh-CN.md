@@ -29,7 +29,7 @@ dsh plugin --profile web add dsh-worktree-panel
 安装指定版本：
 
 ```sh
-dsh plugin --profile web add dsh-worktree-panel@0.1.5
+dsh plugin --profile web add dsh-worktree-panel@0.1.6
 ```
 
 ### 升级
@@ -69,6 +69,8 @@ dsh plugin --profile web add link:/到/dsh-worktree-panel/的绝对路径
 ### 生成客户端 bundle
 
 `lib/client.js` 由 `lib/build.mjs` 从官方 `@deepseek-ai/dsh-client-ui-workspace` 浏览器 bundle 生成。构建过程会验证官方包版本，并在生成文件头部记录来源版本。
+
+构建还会根据客户端实际引用的模块，同步 `package.json` 中的 `dsh.client.external`，确保 DSH 在启动插件前加载依赖代码。`inject` 是服务注入声明，不能替代这份模块加载声明。
 
 需要时可以显式指定官方 bundle：
 
