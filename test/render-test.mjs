@@ -4,18 +4,17 @@
 // This exercises the injected nested SessionTree code exactly as the browser
 // would — any undefined identifier or bad prop throws here first.
 import { createRequire } from "node:module"
-import { existsSync, globSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
-import { homedir } from "node:os"
 
-// Resolve react/react-dom from the dsh CLI's npx-cache dependency tree
-// (the same store that hosts @deepseek-ai/dsh-client-ui-workspace), or from
-// an explicit checkout (WTP_REACT_DIR) when no DSH install is present.
+const root = join(dirname(fileURLToPath(import.meta.url)), "..")
+
+// Resolve react/react-dom from this repo's own devDependencies (WTP_REACT_DIR
+// still overrides for cross-version testing).
 const reactPkg = process.env.WTP_REACT_DIR
   ? join(process.env.WTP_REACT_DIR, "package.json")
-  : (globSync(join(homedir(), ".npm", "_npx", "*", "node_modules", "react", "package.json"))[0]
-    ?? globSync(join(homedir(), ".dsh", "profiles", "*", "node_modules", "react", "package.json"))[0])
+  : join(root, "package.json")
 if (!reactPkg || !existsSync(reactPkg)) throw new Error("cannot locate react (set WTP_REACT_DIR)")
 const cliRequire = createRequire(reactPkg)
 const React = cliRequire("react")
@@ -74,7 +73,6 @@ const fakeWindow = {
 }
 let factoryRef
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const code = readFileSync(join(root, "lib", "client.js"), "utf8")
 const generatedMatch = /^\/\/ Generated from @deepseek-ai\/dsh-client-ui-workspace@(\d+)\.(\d+)\./m.exec(code)
 const upstream02 = generatedMatch !== null && Number(generatedMatch[1]) === 0 && Number(generatedMatch[2]) >= 2

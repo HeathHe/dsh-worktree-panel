@@ -4,28 +4,18 @@
 // are caught before the browser loads it. Rendering happens inside the slot
 // framework, so apply only needs locale/slots/workspaces/sessions stubs.
 import assert from "node:assert/strict"
-import { createRequire } from "node:module"
-import { existsSync, globSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
-import { homedir } from "node:os"
+import { React, jsxRuntime, loadLoaderSource } from "./runtime.mjs"
 
-const profileRequire = createRequire(join(homedir(), ".dsh", "profiles", "web", "package.json"))
-const React = profileRequire("react")
-const jsxRuntime = profileRequire("react/jsx-runtime")
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
 
 // Like the build, use an installed DSH bundle rather than reimplementing its
 // loader in the test. An explicit path allows checking a different host version.
-const loaderPath = process.env.DSH_CLIENT_MODULES_BUNDLE || [
-  "/Applications/DSH Desktop.app/Contents/Resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh-client-modules/lib/client.js",
-  join(homedir(), ".dsh", "profiles", "web", "node_modules", "@deepseek-ai", "dsh-client-modules", "lib", "client.js"),
-  ...globSync(join(homedir(), ".npm", "_npx", "*", "node_modules", "@deepseek-ai", "dsh-client-modules", "lib", "client.js")),
-].find((path) => existsSync(path))
-if (!loaderPath) throw new Error("cannot locate DSH client module loader; set DSH_CLIENT_MODULES_BUNDLE")
 let loaderRegistration
-new Function("window", readFileSync(loaderPath, "utf8"))({
+new Function("window", loadLoaderSource())({
   __ModuleLoader__: { load: (registration) => { loaderRegistration = registration } },
 })
 const loaderExports = loaderRegistration.factory((name) => {
@@ -65,25 +55,51 @@ const primitivesStub = new Proxy(
   },
 )
 
-const runtimeId = "@deepseek-ai/dsh-client-runtime"
+// The rebuilt 0.2.x upstream inlined abbreviateHomePath (no runtime module
+// require anymore); its remaining dynamic externals are store, primitives and
+// cordis, with react seeded by the platform.
+const storeId = "@deepseek-ai/dsh-client-store"
 const primitivesId = "@deepseek-ai/dsh-client-ui-primitives"
+const cordisId = "@deepseek-ai/cordis"
 const factories = new Map([
   [packageJson.name, factory],
-  [runtimeId, () => ({
-    defineStore: (spec) => ({ ...spec }),
-    abbreviateHomePath: (path, home) => home && path.startsWith(home) ? "~" + path.slice(home.length) : path,
+  [storeId, () => ({
+    createSnapshotStore: (value) => ({
+      getSnapshot: () => value,
+      set: () => {},
+      subscribe: () => () => {},
+      create: () => ({ getSnapshot: () => value }),
+    }),
+    // apply() registers the view store: a handle whose create() yields a live
+    // instance. Smoke scope only needs the shape, not the persistence.
+    defineStore: (spec) => {
+      const state = typeof spec.init === "function" ? spec.init() : {};
+      const instance = {
+        getSnapshot: () => state,
+        subscribe: () => () => {},
+        set: (fn) => typeof fn === "function" && fn(state),
+        ...Object.fromEntries(Object.entries(spec.actions ?? {}).map(([name]) => [name, () => {}])),
+      };
+      return { ...spec, create: () => instance };
+    },
   })],
   [primitivesId, () => primitivesStub],
+  // cordis's only consumed export is Service, subclassed at module scope.
+  [cordisId, () => ({ Service: class ServiceStub {} })],
 ])
 
 async function coldImport(external) {
   const loaded = []
+  const entryIds = [...factories.keys()]
   const manifest = parseBootManifest({
     rev: "test",
-    entries: [...factories.keys()].map((id) => ({
+    release: { version: "test" },
+    entries: entryIds.map((id) => ({
       id, url: id, rev: "test",
       ...(id === packageJson.name ? { ...packageJson.dsh.client, external } : {}),
     })),
+    // 0.2.x loader wire format: every entry is named by one delivery batch.
+    batches: [{ phase: "application", url: "test-batch", rev: "test", entries: entryIds }],
   })
   const loader = new ClientModuleSystem({
     manifest,
@@ -100,16 +116,16 @@ async function coldImport(external) {
 }
 
 // Neither injected services nor platform-provided React should accidentally
-// warm the runtime/primitives cache and mask missing dynamic dependencies.
-await assert.rejects(coldImport(undefined), /require\("@deepseek-ai\/dsh-client-runtime\/client"\) missed the module table/)
-await assert.rejects(coldImport([runtimeId + "/client"]), /require\("@deepseek-ai\/dsh-client-ui-primitives"\) missed the module table/)
+// warm the externals cache and mask missing dynamic dependencies.
+await assert.rejects(coldImport(undefined), /require\("@deepseek-ai\/dsh-client-store"\) missed the module table/)
+await assert.rejects(coldImport([storeId + "/client"]), /require\("@deepseek-ai\/dsh-client-ui-primitives"\) missed the module table/)
 const { mod, loaded } = await coldImport(packageJson.dsh.client.external)
 assert.equal(loaded.at(-1), packageJson.name, "dependencies must arrive before the plugin")
-assert.deepEqual(new Set(loaded), new Set([runtimeId, primitivesId, packageJson.name]))
+assert.deepEqual(new Set(loaded), new Set([storeId, primitivesId, cordisId, packageJson.name]))
 
 if (typeof mod.apply !== "function") throw new Error("client bundle exports no apply")
 if (!Array.isArray(mod.inject)) throw new Error("client bundle exports no inject list")
-if (!mod.inject.includes("connection")) throw new Error("client bundle does not inject connection")
+if (!mod.inject.includes("slots")) throw new Error("client bundle does not inject slots")
 
 const registrations = []
 const hostDescription = {
@@ -117,7 +133,16 @@ const hostDescription = {
   subscribe: () => () => {},
 }
 const ctx = {
-  get: (name) => name === "connection" ? { hostDescription } : undefined,
+  get: (name) => ctx[name],
+  // 0.2.x upstream reads host info and the directory picker through the
+  // `remote` service, and workspace access through `remoteAccess`.
+  remote: {
+    $host: { home: "/Users/you" },
+    directoryPicker: { pick: async () => undefined },
+  },
+  remoteAccess: { source: () => undefined },
+  on: () => () => {},
+  shortcuts: { register: () => ({ dispose: () => {} }) },
   locale: {
     register: () => {},
     bind: (ns) => (key, vars) => key,
@@ -128,6 +153,8 @@ const ctx = {
     binding: () => undefined,
     fork: async () => "child",
     open: () => {},
+    // UiWorkspaceService subscribes to the authoritative session list.
+    list: { getSnapshot: () => [], subscribe: () => () => {} },
   },
   workspaces: {
     startSession: () => {},
@@ -137,10 +164,14 @@ const ctx = {
     archiveSession: async () => {},
     insertSessionBefore: async () => {},
     create: async () => ({}),
+    // UiWorkspaceService subscribes to the authoritative workspace list.
+    list: { getSnapshot: () => [], subscribe: () => () => {} },
   },
   slots: {
     entries: () => [],
     subscribe: () => () => {},
+    provideRoot: () => {},
+    registerFactory: () => {},
     inject: (name, cb) => {
       registrations.push({ name, registered: cb() })
     },
