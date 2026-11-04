@@ -78,6 +78,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const code = readFileSync(join(root, "lib", "client.js"), "utf8")
 const generatedMatch = /^\/\/ Generated from @deepseek-ai\/dsh-client-ui-workspace@(\d+)\.(\d+)\./m.exec(code)
 const upstream02 = generatedMatch !== null && Number(generatedMatch[1]) === 0 && Number(generatedMatch[2]) >= 2
+// Generation-specific row component + metrics must match the bundle.
+if (upstream02 && !code.includes("__wtpEnsureCss02")) throw new Error("0.2 metrics CSS missing from generated bundle")
+if (!upstream02 && code.includes("__wtpEnsureCss02")) throw new Error("0.2 metrics CSS leaked into 0.1 bundle")
 
 new Function("window", "document", code)(fakeWindow, fakeDocument)
 if (!factoryRef) throw new Error("no factory")
