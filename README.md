@@ -61,8 +61,8 @@ dsh plugin --profile web add link:/absolute/path/to/dsh-worktree-panel
 
 ## Compatibility
 
-- Tested with **DSH Desktop 2.0.3 / DeepSeek Harness 0.1.1-rc.2**.
-- DSH peer dependency range: `>=0.1.1-rc.2 <0.2.0`.
+- Tested with **DSH Desktop 2.0.3 / DeepSeek Harness 0.1.1-rc.2** and **DSH Desktop 0.2.1-rc.5**.
+- DSH peer dependency range: `>=0.1.1-rc.2 <0.3.0`. The build detects the upstream SessionTree generation (`0.1.x` vs `0.2.x`) and patches accordingly; regenerate with `npm run build` after upgrading DSH.
 - Uses a dedicated Worktree settings page through `settings.section`.
 - Supports the current Host description store and home-directory path abbreviation.
 
