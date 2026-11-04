@@ -1,18 +1,21 @@
 // Render test: mounts the patched official WorkspaceBrowser (captured from the
-// slot registration) with react-dom/server, feeding it a realistic
-// workspaces/sessions store plus a worktree-tree fixture from the /tree API.
+// slot registration) with react-dom/server, feeding it realistic
+// workspaces/sessions stores plus a worktree-tree fixture from the /tree API.
 // This exercises the injected nested SessionTree code exactly as the browser
 // would — any undefined identifier or bad prop throws here first.
 import { createRequire } from "node:module"
-import { readFileSync, writeFileSync, globSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
-import { homedir } from "node:os"
 
-// Resolve react/react-dom from the dsh CLI's npx-cache dependency tree
-// (the same store that hosts @deepseek-ai/dsh-client-ui-workspace).
-const reactPkg = globSync(join(homedir(), ".npm", "_npx", "*", "node_modules", "react", "package.json"))[0]
-if (!reactPkg) throw new Error("cannot locate react in the npx cache")
+const root = join(dirname(fileURLToPath(import.meta.url)), "..")
+
+// Resolve react/react-dom from this repo's own devDependencies (WTP_REACT_DIR
+// still overrides for cross-version testing).
+const reactPkg = process.env.WTP_REACT_DIR
+  ? join(process.env.WTP_REACT_DIR, "package.json")
+  : join(root, "package.json")
+if (!reactPkg || !existsSync(reactPkg)) throw new Error("cannot locate react (set WTP_REACT_DIR)")
 const cliRequire = createRequire(reactPkg)
 const React = cliRequire("react")
 const ReactDOMServer = cliRequire("react-dom/server")
@@ -29,6 +32,8 @@ const primitives = new Proxy(
     get: (target, prop) => {
       if (prop === Symbol.toStringTag) return "Module"
       if (prop === "HoverCard") return ({ anchor }) => anchor
+      if (prop === "HoverCardGroup") return ({ children }) => children
+      if (prop === "relativeTime") return () => ({ unit: "minute", n: 5 })
       if (prop === "Menu") {
         return ({ items = [] }) => React.createElement(
           "div",
@@ -36,7 +41,9 @@ const primitives = new Proxy(
           items.map((item) => React.createElement("span", { key: item.id }, item.label)),
         )
       }
-      return "dsh-stub"
+      // Function exports (relativeTime, abbreviate helpers) and icon/row
+      // components alike: rendering null keeps the focus on our nesting.
+      return (...args) => (typeof args[0] === "string" && args.length === 1 ? args[0] : null)
     },
   },
 )
@@ -66,7 +73,13 @@ const fakeWindow = {
 }
 let factoryRef
 
-const code = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "lib", "client.js"), "utf8")
+const code = readFileSync(join(root, "lib", "client.js"), "utf8")
+const generatedMatch = /^\/\/ Generated from @deepseek-ai\/dsh-client-ui-workspace@(\d+)\.(\d+)\./m.exec(code)
+const upstream02 = generatedMatch !== null && Number(generatedMatch[1]) === 0 && Number(generatedMatch[2]) >= 2
+// Generation-specific row component + metrics must match the bundle.
+if (upstream02 && !code.includes("__wtpEnsureCss02")) throw new Error("0.2 metrics CSS missing from generated bundle")
+if (!upstream02 && code.includes("__wtpEnsureCss02")) throw new Error("0.2 metrics CSS leaked into 0.1 bundle")
+
 new Function("window", "document", code)(fakeWindow, fakeDocument)
 if (!factoryRef) throw new Error("no factory")
 
@@ -80,6 +93,22 @@ const mod = factoryRef((name) => {
       abbreviateHomePath: (path, home) => home && path.startsWith(home) ? "~" + path.slice(home.length) : path,
     }
   }
+  // 0.2 line: state goes through dsh-client-store, services extend cordis.
+  if (name === "@deepseek-ai/dsh-client-store") {
+    const snapshotStore = (initial) => {
+      let current = initial
+      return {
+        getSnapshot: () => current,
+        subscribe: () => () => {},
+        set: (next) => { current = next },
+      }
+    }
+    return {
+      defineStore: (spec) => ({ ...spec, create: () => ({ actions: {}, ...spec.init?.() }) }),
+      createSnapshotStore: snapshotStore,
+    }
+  }
+  if (name === "@deepseek-ai/cordis") return { Service: class {} }
   if (name === "@deepseek-ai/dsh-client-ui-primitives") return primitives
   throw new Error("unexpected require: " + name)
 })
@@ -90,8 +119,33 @@ const hostDescription = {
   getSnapshot: () => ({ home: "/Users/you" }),
   subscribe: () => () => {},
 }
+const listSnapshot = () => ({
+  getSnapshot: () => ({ pinnedSessionIds: [], archivedSessionIds: [], byId: {}, ids: [] }),
+  subscribe: () => () => {},
+})
 const ctx = {
-  get: (name) => name === "connection" ? { hostDescription } : undefined,
+  get: (name) => {
+    if (name === "connection") return { hostDescription }
+    if (name === "sessions") {
+      return {
+        search: async () => ({ ok: true, value: { items: [] } }),
+        searchResultLimit: 50,
+        binding: () => undefined,
+        list: listSnapshot(),
+      }
+    }
+    if (name === "workspaces") {
+      return {
+        list: listSnapshot(),
+        rename: async () => {}, delete: async () => {}, insertBefore: async () => {},
+        create: async () => ({}),
+      }
+    }
+    return undefined
+  },
+  remote: { $host: { home: "/Users/you" }, directoryPicker: {} },
+  on: () => () => {},
+  shortcuts: { catalog: [], register: () => {} },
   locale: { register: () => {}, bind: (ns) => (key, vars) => key },
   sessions: { search: async () => ({ ok: true, value: { items: [] } }), searchResultLimit: 50, binding: () => undefined },
   workspaces: {},
@@ -99,7 +153,10 @@ const ctx = {
     entries: () => [], subscribe: () => () => {},
     inject: (name, cb) => { registered[name] = cb() },
     register: (opts, Component) => ({ opts, Component }),
+    registerFactory: () => {},
+    provideRoot: () => {},
   },
+  // Effects (navigation policy, shortcut registration) don't run under SSR.
   effect: () => () => {},
 }
 mod.apply(ctx)
@@ -108,31 +165,34 @@ if (!WorkspaceBrowser) throw new Error("WorkspaceBrowser not captured")
 
 // ---- store fixtures ----
 const now = Date.now()
-const sess = (id, title, extra = {}) => ({ id, displayTitle: title, updatedAt: now - 1000, completed: true, running: false, blank: false, ...extra })
+const sess = (id, title, extra = {}) => ({ id, title, displayTitle: title, updatedAt: now - 1000, blank: false, ...extra })
 const byId = {
-  s1: sess("s1", "主树上的会话"),
+  s1: sess("s1", "主树上的会话", { retainedBy: { mainView: 1 } }),
   s2: sess("s2", "feature-01 里的会话", { running: true }),
   s3: sess("s3", "feature-01 里另一个会话"),
   s4: sess("s4", "不应显示的子代理会话", { origin: "subagent" }),
 }
 const sessionsState = {
   phase: "ready",
-  current: "s1",
   ids: ["s1", "s2", "s3", "s4"],
   byId,
+  projectionsBySession: {},
 }
 const workspacesState = {
   phase: "ready",
+  state: "idle",
   items: [
     { workspaceId: "ws-main", title: "myapp", createdAt: now, sessionIds: ["s1"] },
     { workspaceId: "ws-feature", title: "myapp/feature-01", createdAt: now, sessionIds: ["s2", "s3", "s4"] },
     { workspaceId: "ws-plain", title: "notes", cwd: "/Users/you/notes", sessionIds: [] },
   ],
   archivedSessionIds: [],
+  pinnedSessionIds: [],
 }
 const viewState = {
   groupBy: "workspace",
   orderBy: "updated",
+  archivedFilter: "default",
   groupExpansion: { "ws-main": true, "ws-feature": true, "ws-plain": true },
   sessionOrderByAccount: {},
   sessionUpdatedAtByAccount: {},
@@ -177,15 +237,21 @@ fakeWindow.__wtpInitialTree = treeFixture
 // ---- hooks ----
 const selectorHook = (state) => (selector) => selector(state)
 const useStore = selectorHook(viewState)
-const useWorkspaces = (selector) => selector(workspacesState)
 const useSessions = (selector) => selector(sessionsState)
+const useSessionStatus = (selector) => selector(new Map())
+const useWorkspaces = (selector) => selector(workspacesState)
+const usePanelInfo = (selector) => selector({ activePanelId: null })
 const useDirectoryFlow = (selector) => selector(false)
 const useHostDescription = (selector) => selector({ home: "/Users/you" })
+const useHostInfo = useHostDescription
+const useShortcuts = (selector) => selector([{ id: "session.search" }, { id: "session.new" }, { id: "workspace.add" }])
+const useWorkspaceShortcuts = (selector) => selector({})
 
 const actions = {
   retainAccountKeys: () => {},
   setGroupBy: () => {}, setOrderBy: () => {}, setGroupExpanded: () => {},
-  syncSessionOrderAccount: () => {}, setSessionOrder: () => {},
+  setArchivedFilter: () => {},
+  syncSessionOrders: () => {}, syncSessionOrderAccount: () => {}, setSessionOrder: () => {},
 }
 const t = (key, params) => {
   const zh = {
@@ -216,8 +282,40 @@ const t = (key, params) => {
   return zh[key] ?? key
 }
 
-// SessionTree needs `useSessions` as a hook returning the full state via selector
-const props = {
+// SessionTree props changed with the 0.2 rewrite (list/useSessionStatus +
+// store-backed expansion/order instead of useSessions/useStore/action hooks).
+const props = upstream02 ? {
+  wide: true,
+  usePanelInfo,
+  expandSidebar: () => {},
+  useSessions,
+  useSessionStatus,
+  useWorkspaces,
+  useStore,
+  actions,
+  startSession: () => {},
+  open: () => {},
+  requestSessionRename: async () => {},
+  notifyArchivedNotOpenable: () => {},
+  renameWorkspace: async () => {},
+  deleteWorkspace: async () => {},
+  insertWorkspaceBefore: async () => {},
+  unarchiveSession: () => {},
+  createWorkspace: async () => ({}),
+  searchSessions: async () => ({ items: [] }),
+  searchResultLimit: 50,
+  useDirectoryFlow,
+  useHostInfo,
+  useShortcuts,
+  useWorkspaceShortcuts,
+  requestSearch: () => {},
+  requestAddWorkspace: () => {},
+  closeAddWorkspace: () => {},
+  setDirectoryBusy: () => {},
+  renderSlot: () => null,
+  t,
+} : {
+  // 0.1 line: SessionTree takes the store hooks directly.
   wide: true,
   expandSidebar: () => {},
   useSessions,
@@ -242,9 +340,7 @@ const props = {
   t,
 }
 
-// SessionTree actually receives useSessions/useWorkspaces/useStore/useDirectoryFlow
-// as slot-provided hooks — but the WorkspaceBrowser component signature we read
-// destructures exactly these; render and catch any runtime error.
+// Render and catch any runtime error.
 let html = ""
 try {
   html = ReactDOMServer.renderToString(React.createElement(WorkspaceBrowser, props))
@@ -265,7 +361,7 @@ const checks = [
   ["subagent session remains hidden", !html.includes("不应显示的子代理会话")],
   ["worktree row plus button", (html.match(/<button[^>]*class="dsh-wtp-icon-btn"/g) || []).length >= 2],
   ["non-git initialization in more menu", html.includes("初始化 Git 并启用 Worktree")],
-  ["no duplicate new-session row", !/>\+ 新会话</.test(html)],
+  ["no duplicate new-session row", !/>＋ 新会话</.test(html)],
   ["dialog closed by default", !html.includes("创建分支") && !html.includes("Create branch")],
 ]
 let failed = 0
@@ -275,4 +371,4 @@ for (const [name, ok] of checks) {
   if (!ok) failed++
 }
 if (failed) process.exit(1)
-console.log("render test OK: patched WorkspaceBrowser rendered with nested worktree dimension")
+console.log("render test OK (upstream " + (upstream02 ? "0.2" : "0.1") + " harness): patched WorkspaceBrowser rendered with nested worktree dimension")

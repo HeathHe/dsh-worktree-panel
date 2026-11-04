@@ -32,7 +32,8 @@
         "@deepseek-ai/dsh-client-ui-settings-general"
       ],
       "external": [
-        "@deepseek-ai/dsh-client-runtime/client",
+        "@deepseek-ai/cordis",
+        "@deepseek-ai/dsh-client-store",
         "@deepseek-ai/dsh-client-ui-primitives",
         "react",
         "react/jsx-runtime"
@@ -41,18 +42,18 @@
     }
   },
   "peerDependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-client-connection": ">=0.1.1-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-client-locale": ">=0.1.1-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-client-runtime": ">=0.1.1-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-client-ui-conversation": ">=0.1.1-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-client-ui-primitives": ">=0.1.1-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.1.1-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-client-ui-settings-general": ">=0.1.1-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.1-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-invariants": ">=0.1.1-rc.2 <0.2.0"
+    "@deepseek-ai/dsh-client-connection": ">=0.1.1-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-locale": ">=0.1.1-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-runtime": ">=0.1.1-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-ui-conversation": ">=0.1.1-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.1.1-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-ui-settings-general": ">=0.1.1-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.1.1-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.1-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-invariants": ">=0.1.1-rc.2 <0.3.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "files": [
     "lib",
@@ -64,5 +65,9 @@
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
 }
